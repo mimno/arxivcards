@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>arXiv CS Papers</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -314,6 +316,41 @@
     }
   }
 
+  function renderLatex(text) {
+    // First replace LaTeX accent commands with Unicode
+    const accents = {
+      '`': '\u0300', "'": '\u0301', '^': '\u0302', '~': '\u0303',
+      '=': '\u0304', '.': '\u0307', '"': '\u0308',
+      'u': '\u0306', 'v': '\u030C', 'H': '\u030B', 'c': '\u0327',
+    };
+    // Handle \'{e}, \'e, \"{o}, \"o, etc.
+    let processed = text.replace(/\\([`'^~=."uvHc])\{([A-Za-z])\}/g, (m, acc, ch) =>
+      accents[acc] ? ch + accents[acc] : m
+    );
+    processed = processed.replace(/\\([`'^~=."])([A-Za-z])/g, (m, acc, ch) =>
+      accents[acc] ? ch + accents[acc] : m
+    );
+    // \ss -> ß, \aa -> å, \AA -> Å, \o -> ø, \O -> Ø, \l -> ł, \L -> Ł, \i -> ı
+    processed = processed.replace(/\\ss\b/g, 'ß');
+    processed = processed.replace(/\\aa\b/g, 'å').replace(/\\AA\b/g, 'Å');
+    processed = processed.replace(/\\o\b/g, 'ø').replace(/\\O\b/g, 'Ø');
+    processed = processed.replace(/\\l\b/g, 'ł').replace(/\\L\b/g, 'Ł');
+    processed = processed.replace(/\\i\b/g, 'ı');
+    // Strip remaining braces used for grouping
+    processed = processed.replace(/\{([A-Za-z\u0080-\uFFFF]+)\}/g, '$1');
+
+    // Escape HTML to prevent injection
+    const escaped = processed.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Replace $...$ with rendered KaTeX (non-greedy, single-line)
+    return escaped.replace(/\$([^$]+)\$/g, (match, tex) => {
+      try {
+        return katex.renderToString(tex, { throwOnError: false });
+      } catch (e) {
+        return match;
+      }
+    });
+  }
+
   function showPaper(index) {
     const p = papers[index];
     const cardLeft = document.getElementById("cardLeft");
@@ -325,17 +362,17 @@
     document.getElementById("categories").innerHTML = catHtml;
 
     // Title
-    document.getElementById("paperTitle").textContent = p.title;
+    document.getElementById("paperTitle").innerHTML = renderLatex(p.title);
 
     // Authors — truncate if too many
     const maxAuthors = 8;
     let authorText = p.authors.slice(0, maxAuthors).join(", ");
     if (p.authors.length > maxAuthors)
       authorText += ` and ${p.authors.length - maxAuthors} others`;
-    document.getElementById("authors").textContent = authorText;
+    document.getElementById("authors").innerHTML = renderLatex(authorText);
 
     // Abstract
-    document.getElementById("abstract").textContent = p.summary;
+    document.getElementById("abstract").innerHTML = renderLatex(p.summary);
 
     // arXiv ID
     document.getElementById("arxivId").textContent = p.id;
