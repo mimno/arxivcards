@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arXiv CS Papers</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-size: 2rem;
+    color: #64748b;
+  }
+
+  .card-container {
+    display: none;
+    height: 100vh;
+    padding: 2.5rem 3rem;
+    flex-direction: column;
+  }
+
+  .card-container.active { display: flex; }
+
+  /* Top bar */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+  }
+
+  .logo span { color: #ea580c; }
+
+  .counter {
+    font-size: 1.1rem;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Main content area */
+  .card {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2.5rem;
+    min-height: 0;
+  }
+
+  .card-left {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .card-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+
+  /* Categories */
+  .categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-shrink: 0;
+  }
+
+  .category {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    background: #e2e8f0;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+  }
+
+  .category.primary {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+  }
+
+  /* Title */
+  .paper-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  /* Authors */
+  .authors {
+    font-size: 1.15rem;
+    color: #64748b;
+    margin-bottom: 1.25rem;
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+
+  /* Abstract */
+  .abstract-container {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .abstract {
+    font-size: 1.3rem;
+    line-height: 1.7;
+    color: #334155;
+    overflow: hidden;
+    max-height: 100%;
+  }
+
+  .abstract-container::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4rem;
+    background: linear-gradient(transparent, #f8fafc);
+    pointer-events: none;
+  }
+
+  /* QR code area */
+  .qr-wrapper {
+    background: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .qr-wrapper canvas, .qr-wrapper img {
+    display: block;
+  }
+
+  .qr-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    text-align: center;
+    max-width: 180px;
+  }
+
+  .arxiv-id {
+    font-size: 1rem;
+    color: #64748b;
+    font-family: monospace;
+    text-align: center;
+  }
+
+  /* Progress bar */
+  .progress-bar-track {
+    height: 4px;
+    background: #e2e8f0;
+    margin-top: 1.5rem;
+    border-radius: 2px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ea580c, #f97316);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s linear;
+  }
+
+  /* Date */
+  .date-line {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  /* Transition */
+  .card-left {
+    opacity: 1;
+    transition: opacity 0.5s ease;
+  }
+
+  .card-left.fading { opacity: 0; }
+
+  /* Controls hint */
+  .controls-hint {
+    position: fixed;
+    bottom: 1rem;
+    right: 1.5rem;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+  }
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">Loading papers&hellip;</div>
+
+<div class="card-container" id="cardContainer">
+  <div class="top-bar">
+    <div class="logo">arXiv <span>CS</span> Papers</div>
+    <div class="counter" id="counter"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-left" id="cardLeft">
+      <div class="categories" id="categories"></div>
+      <div class="paper-title" id="paperTitle"></div>
+      <div class="authors" id="authors"></div>
+      <div class="abstract-container">
+        <div class="abstract" id="abstract"></div>
+      </div>
+    </div>
+    <div class="card-right">
+      <div class="qr-wrapper" id="qrWrapper"></div>
+      <div class="arxiv-id" id="arxivId"></div>
+      <div class="qr-label">Scan for full paper</div>
+    </div>
+  </div>
+
+  <div class="progress-bar-track">
+    <div class="progress-bar-fill" id="progressBar"></div>
+  </div>
+</div>
+
+<div class="controls-hint">Space: pause &middot; &larr;&rarr;: navigate</div>
+
+<script>
+(function () {
+  const CYCLE_MS = 25000; // 25 seconds per paper
+  const FADE_MS = 500;
+
+  let papers = [];
+  let currentIndex = 0;
+  let paused = false;
+  let timer = null;
+  let progressStart = null;
+  let progressRaf = null;
+
+  // Load papers from papers.json
+  async function loadPapers() {
+    try {
+      const resp = await fetch("papers.json");
+      if (!resp.ok) throw new Error("Failed to load papers.json");
+      const data = await resp.json();
+      papers = data.papers || [];
+      if (papers.length === 0) {
+        document.getElementById("loading").textContent = "No papers found.";
+        return;
+      }
+      // Shuffle for variety
+      shuffle(papers);
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("cardContainer").classList.add("active");
+      showPaper(0);
+      startTimer();
+    } catch (e) {
+      document.getElementById("loading").textContent =
+        "Could not load papers.json — run fetch_papers.py first.";
+      console.error(e);
+    }
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  function showPaper(index) {
+    const p = papers[index];
+    const cardLeft = document.getElementById("cardLeft");
+
+    // Categories
+    const catHtml = p.categories
+      .map(c => `<span class="category${c === p.primary_category ? " primary" : ""}">${c}</span>`)
+      .join("");
+    document.getElementById("categories").innerHTML = catHtml;
+
+    // Title
+    document.getElementById("paperTitle").textContent = p.title;
+
+    // Authors — truncate if too many
+    const maxAuthors = 8;
+    let authorText = p.authors.slice(0, maxAuthors).join(", ");
+    if (p.authors.length > maxAuthors)
+      authorText += ` and ${p.authors.length - maxAuthors} others`;
+    document.getElementById("authors").textContent = authorText;
+
+    // Abstract
+    document.getElementById("abstract").textContent = p.summary;
+
+    // arXiv ID
+    document.getElementById("arxivId").textContent = p.id;
+
+    // Counter
+    document.getElementById("counter").textContent = `${index + 1} / ${papers.length}`;
+
+    // QR code
+    generateQR(p.abs_url);
+
+    // Adapt title size for very long titles
+    const titleEl = document.getElementById("paperTitle");
+    titleEl.style.fontSize = p.title.length > 120 ? "1.8rem" : "2.4rem";
+  }
+
+  function generateQR(url) {
+    const wrapper = document.getElementById("qrWrapper");
+    wrapper.innerHTML = "";
+    const qr = qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    const size = 180;
+    const cellSize = Math.floor(size / qr.getModuleCount());
+    const img = qr.createImgTag(cellSize, 0);
+    wrapper.innerHTML = img;
+  }
+
+  function startTimer() {
+    progressStart = Date.now();
+    animateProgress();
+    timer = setTimeout(nextPaper, CYCLE_MS);
+  }
+
+  function stopTimer() {
+    clearTimeout(timer);
+    cancelAnimationFrame(progressRaf);
+  }
+
+  function animateProgress() {
+    const elapsed = Date.now() - progressStart;
+    const pct = Math.min(100, (elapsed / CYCLE_MS) * 100);
+    document.getElementById("progressBar").style.width = pct + "%";
+    if (pct < 100) {
+      progressRaf = requestAnimationFrame(animateProgress);
+    }
+  }
+
+  function nextPaper() {
+    transitionTo((currentIndex + 1) % papers.length);
+  }
+
+  function prevPaper() {
+    transitionTo((currentIndex - 1 + papers.length) % papers.length);
+  }
+
+  function transitionTo(index) {
+    stopTimer();
+    const cardLeft = document.getElementById("cardLeft");
+    cardLeft.classList.add("fading");
+    setTimeout(() => {
+      currentIndex = index;
+      showPaper(currentIndex);
+      cardLeft.classList.remove("fading");
+      if (!paused) startTimer();
+    }, FADE_MS);
+  }
+
+  // Keyboard controls
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      paused = !paused;
+      if (paused) {
+        stopTimer();
+        document.getElementById("progressBar").style.width =
+          document.getElementById("progressBar").style.width; // freeze
+      } else {
+        startTimer();
+      }
+    } else if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+      nextPaper();
+    } else if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+      prevPaper();
+    }
+  });
+
+  loadPapers();
+})();
+</script>
+</body>
+</html>
