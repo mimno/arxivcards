@@ -181,22 +181,31 @@
     text-align: center;
   }
 
-  /* Progress bar */
-  .progress-bar-track {
-    height: 4px;
-    background: #e2e8f0;
-    margin-top: 1.5rem;
-    border-radius: 2px;
-    flex-shrink: 0;
-    overflow: hidden;
+  /* Circular progress */
+  .progress-ring-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 28px;
+    height: 28px;
   }
 
-  .progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #ea580c, #f97316);
-    border-radius: 2px;
-    width: 0%;
-    transition: width 0.3s linear;
+  .progress-ring-container svg {
+    transform: rotate(-90deg);
+  }
+
+  .progress-ring-bg {
+    fill: none;
+    stroke: #e2e8f0;
+    stroke-width: 3;
+  }
+
+  .progress-ring-fill {
+    fill: none;
+    stroke: #94a3b8;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s linear;
   }
 
   /* Date */
@@ -219,7 +228,7 @@
   .controls-hint {
     position: fixed;
     bottom: 1rem;
-    right: 1.5rem;
+    right: 4rem;
     font-size: 0.8rem;
     color: #cbd5e1;
   }
@@ -251,8 +260,12 @@
     </div>
   </div>
 
-  <div class="progress-bar-track">
-    <div class="progress-bar-fill" id="progressBar"></div>
+  <div class="progress-ring-container">
+    <svg width="28" height="28">
+      <circle class="progress-ring-bg" cx="14" cy="14" r="11" />
+      <circle class="progress-ring-fill" id="progressRing" cx="14" cy="14" r="11"
+        stroke-dasharray="69.115" stroke-dashoffset="69.115" />
+    </svg>
   </div>
 </div>
 
@@ -361,11 +374,14 @@
     cancelAnimationFrame(progressRaf);
   }
 
+  const RING_CIRCUMFERENCE = 2 * Math.PI * 11; // ~69.115
+
   function animateProgress() {
     const elapsed = Date.now() - progressStart;
-    const pct = Math.min(100, (elapsed / CYCLE_MS) * 100);
-    document.getElementById("progressBar").style.width = pct + "%";
-    if (pct < 100) {
+    const pct = Math.min(1, elapsed / CYCLE_MS);
+    const offset = RING_CIRCUMFERENCE * (1 - pct);
+    document.getElementById("progressRing").style.strokeDashoffset = offset;
+    if (pct < 1) {
       progressRaf = requestAnimationFrame(animateProgress);
     }
   }
@@ -397,8 +413,7 @@
       paused = !paused;
       if (paused) {
         stopTimer();
-        document.getElementById("progressBar").style.width =
-          document.getElementById("progressBar").style.width; // freeze
+        // freeze ring in place
       } else {
         startTimer();
       }
